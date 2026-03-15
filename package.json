@@ -1,0 +1,17 @@
+{
+  "name": "ts",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "ts-node index.ts",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@vitest/coverage-v8": "^3.0.8",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0",
+    "vitest": "^3.0.8"
+  }
+}
