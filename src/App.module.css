@@ -1,0 +1,25 @@
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.heading {
+  text-align: center;
+  margin-bottom: 24px;
+  color: #333;
+}
+
+.grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center;
+}
+
+.message {
+  text-align: center;
+  padding: 40px;
+  font-size: 18px;
+  color: #666;
+}
