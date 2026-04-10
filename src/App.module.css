@@ -1,0 +1,20 @@
+.app {
+  min-height: 100vh;
+  padding: 0 0 40px;
+  color: #fff;
+  transition: background 0.5s ease;
+}
+
+.content {
+  max-width: 500px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.message {
+  text-align: center;
+  padding: 60px 20px;
+  font-size: 18px;
+  opacity: 0.8;
+  color: #fff;
+}

@@ -1,0 +1,63 @@
+.container {
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  color: inherit;
+  max-width: 300px;
+  margin: 0 auto;
+}
+
+.title {
+  margin: 0 0 16px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.aqiCircle {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.aqiValue {
+  font-size: 32px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.label {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.components {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.component {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.compName {
+  display: block;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.compValue {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+}

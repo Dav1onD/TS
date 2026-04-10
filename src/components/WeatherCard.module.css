@@ -1,0 +1,49 @@
+.card {
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+  min-width: 180px;
+  color: inherit;
+}
+
+.date {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  opacity: 0.9;
+}
+
+.time {
+  font-size: 12px;
+  opacity: 0.7;
+  margin-bottom: 8px;
+}
+
+.icon {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto;
+}
+
+.temp {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 8px 0;
+}
+
+.description {
+  font-size: 14px;
+  text-transform: capitalize;
+  margin-bottom: 8px;
+  opacity: 0.9;
+}
+
+.details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  opacity: 0.8;
+}
