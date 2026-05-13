@@ -1,0 +1,439 @@
+:root {
+  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+  color: #16202f;
+  background:
+    radial-gradient(circle at top left, rgba(52, 144, 220, 0.18), transparent 26%),
+    linear-gradient(180deg, #f8fbff 0%, #e9f0f7 100%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.loading-screen,
+.page-shell {
+  min-height: 100vh;
+}
+
+.loading-screen {
+  display: grid;
+  place-items: center;
+}
+
+.page-shell {
+  padding: 24px;
+}
+
+.dashboard,
+.editor-shell {
+  display: grid;
+  gap: 16px;
+}
+
+.dashboard-hero,
+.editor-header,
+.toolbar,
+.spreadsheet,
+.document-card,
+.modal-card {
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.08);
+}
+
+.dashboard-hero,
+.editor-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 20px;
+  border-radius: 24px;
+}
+
+.dashboard-hero-compact {
+  justify-content: flex-end;
+  padding: 16px 20px;
+}
+
+.document-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.document-card {
+  border-radius: 22px;
+  overflow: hidden;
+}
+
+.document-open-button {
+  width: 100%;
+  border: none;
+  padding: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.document-card-body {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+}
+
+.document-card-body h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.document-card-body p {
+  margin: 0;
+  color: #607086;
+  font-size: 14px;
+}
+
+.preview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  padding: 1px;
+  background: #cbd5e1;
+}
+
+.preview-cell {
+  min-height: 54px;
+  padding: 8px;
+  background: #f8fafc;
+  font-size: 13px;
+  overflow: hidden;
+}
+
+.card-actions,
+.editor-actions,
+.modal-actions,
+.header-chips,
+.size-grid {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.card-actions {
+  padding: 0 16px 16px;
+}
+
+.primary-button,
+.ghost-button,
+.danger-button,
+.card-actions button,
+.context-menu button {
+  border: none;
+  border-radius: 999px;
+  padding: 10px 14px;
+}
+
+.primary-button {
+  background: #0f62fe;
+  color: #fff;
+}
+
+.ghost-button,
+.card-actions button,
+.context-menu button {
+  background: #edf4ff;
+  color: #194067;
+}
+
+.danger-button {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.editor-header {
+  align-items: center;
+}
+
+.editor-title-block {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.document-title-input {
+  width: min(100%, 480px);
+  text-align: center;
+  font-size: 24px;
+  font-weight: 700;
+  border: none;
+  background: transparent;
+  outline: none;
+}
+
+.save-pill {
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.save-saved {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.save-saving {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.save-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.save-error {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.sheet-shell {
+  display: grid;
+  gap: 12px;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 16px;
+}
+
+.toolbar-label {
+  font-weight: 700;
+  color: #486581;
+}
+
+.formula-input {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+}
+
+.spreadsheet {
+  position: relative;
+  overflow: hidden;
+  height: min(72vh, 760px);
+  border-radius: 20px;
+}
+
+.corner-cell {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 4;
+  border-right: 1px solid #d9e2ec;
+  border-bottom: 1px solid #d9e2ec;
+  background: #f8fafc;
+}
+
+.column-headers {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 36px;
+  overflow: hidden;
+  z-index: 3;
+}
+
+.column-track {
+  position: relative;
+  height: 100%;
+}
+
+.column-header,
+.row-header,
+.cell {
+  position: absolute;
+  border-right: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.column-header,
+.row-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8fafc;
+  font-size: 13px;
+  color: #334e68;
+}
+
+.grid-scroll {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+}
+
+.row-index-track {
+  position: absolute;
+  left: 0;
+  z-index: 2;
+  background: #f8fafc;
+}
+
+.cell-track {
+  position: absolute;
+}
+
+.cell {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.cell.range {
+  background: #eff6ff;
+}
+
+.cell.selected {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+  z-index: 1;
+}
+
+.cell-value {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cell-editor {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+}
+
+.resize-handle {
+  position: absolute;
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+
+.resize-column {
+  top: 0;
+  right: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+}
+
+.resize-row {
+  left: 0;
+  bottom: -3px;
+  width: 100%;
+  height: 6px;
+  cursor: row-resize;
+}
+
+.context-menu {
+  position: fixed;
+  z-index: 20;
+  display: grid;
+  gap: 4px;
+  min-width: 220px;
+  padding: 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.16);
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.38);
+}
+
+.modal-card {
+  width: min(100%, 520px);
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+  border-radius: 24px;
+}
+
+.modal-card h2 {
+  margin: 0;
+}
+
+.modal-card label {
+  display: grid;
+  gap: 8px;
+}
+
+.modal-card input {
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.helper-text {
+  margin: 0;
+  color: #607086;
+}
+
+.header-chip {
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+@media (max-width: 900px) {
+  .page-shell {
+    padding: 12px;
+  }
+
+  .dashboard-hero,
+  .editor-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .editor-title-block {
+    justify-items: start;
+  }
+
+  .document-title-input {
+    text-align: left;
+    width: 100%;
+  }
+}
