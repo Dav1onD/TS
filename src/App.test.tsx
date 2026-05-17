@@ -58,24 +58,29 @@ describe('App document management', () => {
     render(<App api={api} />);
     fireEvent.click(await screen.findByTestId(`open-document-${own.id}`));
 
+    const formulaInput = await screen.findByTestId('formula-input');
     vi.useFakeTimers();
-    const formulaInput = screen.getByTestId('formula-input');
-    fireEvent.change(formulaInput, { target: { value: '42' } });
 
-    expect(screen.getByTestId('save-status')).toHaveTextContent('Изменения не сохранены');
+    try {
+      fireEvent.change(formulaInput, { target: { value: '42' } });
 
-    await act(async () => {
-      vi.advanceTimersByTime(499);
-    });
-    expect(api.patchDocument).not.toHaveBeenCalled();
+      expect(screen.getByTestId('save-status')).toHaveTextContent('Изменения не сохранены');
 
-    await act(async () => {
-      vi.advanceTimersByTime(1);
-      await Promise.resolve();
-    });
+      await act(async () => {
+        vi.advanceTimersByTime(499);
+      });
+      expect(api.patchDocument).not.toHaveBeenCalled();
 
-    expect(api.patchDocument).toHaveBeenCalledTimes(1);
-    vi.useRealTimers();
+      await act(async () => {
+        vi.advanceTimersByTime(1);
+        await Promise.resolve();
+      });
+
+      expect(api.patchDocument).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+
     await waitFor(() => expect(screen.getByTestId('save-status')).toHaveTextContent('Сохранено'));
   });
 

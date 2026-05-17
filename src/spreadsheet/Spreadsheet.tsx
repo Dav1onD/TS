@@ -1,18 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { columnLabelFromIndex, getDisplayValue, makeCellKey } from './formulas';
 import { cellStoreToMap } from './documentUtils';
-import type { CellCoord, ContextMenuState, SelectionRange, SpreadsheetDocument } from './types';
+import type { CellCoord, ContextMenuState, SelectionRange } from './types';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import {
+  deleteColumn,
+  deleteRow,
+  insertColumn,
+  insertRow,
+  selectCell,
+  selectRange,
+  setColumnWidth,
+  setRowHeight,
+  updateCell,
+} from '../store/spreadsheetSlice';
 
 const HEADER_HEIGHT = 36;
 const INDEX_COLUMN_WIDTH = 56;
 const OVERSCAN = 8;
 const MIN_COLUMN_WIDTH = 48;
 const MIN_ROW_HEIGHT = 24;
-
-type SpreadsheetProps = {
-  document: SpreadsheetDocument;
-  onChange: React.Dispatch<React.SetStateAction<SpreadsheetDocument | null>>;
-};
 
 function normalizeRange(range: SelectionRange): SelectionRange {
   return {
@@ -65,9 +72,11 @@ function findVisibleIndex(offsets: number[], position: number) {
   return Math.max(0, low - 1);
 }
 
-export function Spreadsheet({ document, onChange }: SpreadsheetProps) {
-  const [selectedCell, setSelectedCell] = useState<CellCoord>({ row: 0, col: 0 });
-  const [selectionRange, setSelectionRange] = useState<SelectionRange | null>(null);
+export function Spreadsheet() {
+  const dispatch = useAppDispatch();
+  const document = useAppSelector((state) => state.spreadsheet.currentDocument);
+  const selectedCell = useAppSelector((state) => state.spreadsheet.selectedCell);
+  const selectionRange = useAppSelector((state) => state.spreadsheet.selectionRange);
   const [editingCell, setEditingCell] = useState<CellCoord | null>(null);
   const [draftValue, setDraftValue] = useState('');
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
@@ -75,12 +84,15 @@ export function Spreadsheet({ document, onChange }: SpreadsheetProps) {
   const [viewportHeight, setViewportHeight] = useState(560);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  const cellsMap = useMemo(() => cellStoreToMap(document.cells), [document.cells]);
-  const columnOffsets = useMemo(() => prefixSums(document.columnWidths), [document.columnWidths]);
-  const rowOffsets = useMemo(() => prefixSums(document.rowHeights), [document.rowHeights]);
+  const cells = document?.cells ?? {};
+  const columnWidths = document?.columnWidths ?? [];
+  const rowHeights = document?.rowHeights ?? [];
+  const cellsMap = useMemo(() => cellStoreToMap(cells), [cells]);
+  const columnOffsets = useMemo(() => prefixSums(columnWidths), [columnWidths]);
+  const rowOffsets = useMemo(() => prefixSums(rowHeights), [rowHeights]);
   const totalWidth = columnOffsets[columnOffsets.length - 1];
   const totalHeight = rowOffsets[rowOffsets.length - 1];
-  const activeRawValue = document.cells[makeCellKey(selectedCell.row, selectedCell.col)] ?? '';
+  const activeRawValue = cells[makeCellKey(selectedCell.row, selectedCell.col)] ?? '';
 
   useEffect(() => {
     const element = containerRef.current;
@@ -118,9 +130,9 @@ export function Spreadsheet({ document, onChange }: SpreadsheetProps) {
     };
   }, []);
 
-  const patchDocument = (updater: (current: SpreadsheetDocument) => SpreadsheetDocument) => {
-    onChange((current) => (current ? updater(current) : current));
-  };
+  if (!document) {
+    return null;
+  }
 
   const startEdit = (row: number, col: number) => {
     setEditingCell({ row, col });
@@ -128,44 +140,23 @@ export function Spreadsheet({ document, onChange }: SpreadsheetProps) {
   };
 
   const commitEdit = (row: number, col: number, value: string) => {
-    patchDocument((current) => {
-      const key = makeCellKey(row, col);
-      const nextCells = { ...current.cells };
-
-      if (value.trim() === '') {
-        delete nextCells[key];
-      } else {
-        nextCells[key] = value;
-      }
-
-      return { ...current, cells: nextCells };
-    });
-
+    dispatch(updateCell({ row, col, value }));
     setEditingCell(null);
     setDraftValue('');
   };
 
   const updateFormulaValue = (value: string) => {
-    patchDocument((current) => {
-      const key = makeCellKey(selectedCell.row, selectedCell.col);
-      const nextCells = { ...current.cells };
-      if (value.trim() === '') {
-        delete nextCells[key];
-      } else {
-        nextCells[key] = value;
-      }
-      return { ...current, cells: nextCells };
-    });
+    dispatch(updateCell({ row: selectedCell.row, col: selectedCell.col, value }));
   };
 
   const handleCellClick = (row: number, col: number, shiftKey: boolean) => {
     const cell = { row, col };
+    dispatch(selectCell(cell));
     if (shiftKey) {
-      setSelectionRange({ start: selectedCell, end: cell });
+      dispatch(selectRange({ start: selectedCell, end: cell }));
     } else {
-      setSelectionRange({ start: cell, end: cell });
+      dispatch(selectRange({ start: cell, end: cell }));
     }
-    setSelectedCell(cell);
     setEditingCell(null);
   };
 
@@ -187,61 +178,9 @@ export function Spreadsheet({ document, onChange }: SpreadsheetProps) {
     if (event.key === 'ArrowLeft') next.col = Math.max(0, selectedCell.col - 1);
 
     if (next.row !== selectedCell.row || next.col !== selectedCell.col) {
-      setSelectedCell(next);
-      setSelectionRange({ start: next, end: next });
+      dispatch(selectCell(next));
+      dispatch(selectRange({ start: next, end: next }));
     }
-  };
-
-  const shiftRows = (rowIndex: number, direction: 1 | -1) => {
-    patchDocument((current) => {
-      const nextCells: Record<string, string> = {};
-      Object.entries(current.cells).forEach(([key, raw]) => {
-        const [row, col] = key.split(':').map(Number);
-        if (direction === -1 && row === rowIndex) {
-          return;
-        }
-        const targetRow = row >= rowIndex && direction === 1 ? row + 1 : row > rowIndex ? row - 1 : row;
-        nextCells[makeCellKey(targetRow, col)] = raw;
-      });
-
-      const rowHeights =
-        direction === 1
-          ? [...current.rowHeights.slice(0, rowIndex), MIN_ROW_HEIGHT + 8, ...current.rowHeights.slice(rowIndex)]
-          : current.rowHeights.filter((_, index) => index !== rowIndex);
-
-      return {
-        ...current,
-        rowCount: Math.max(1, current.rowCount + direction),
-        cells: nextCells,
-        rowHeights,
-      };
-    });
-  };
-
-  const shiftColumns = (colIndex: number, direction: 1 | -1) => {
-    patchDocument((current) => {
-      const nextCells: Record<string, string> = {};
-      Object.entries(current.cells).forEach(([key, raw]) => {
-        const [row, col] = key.split(':').map(Number);
-        if (direction === -1 && col === colIndex) {
-          return;
-        }
-        const targetCol = col >= colIndex && direction === 1 ? col + 1 : col > colIndex ? col - 1 : col;
-        nextCells[makeCellKey(row, targetCol)] = raw;
-      });
-
-      const columnWidths =
-        direction === 1
-          ? [...current.columnWidths.slice(0, colIndex), 120, ...current.columnWidths.slice(colIndex)]
-          : current.columnWidths.filter((_, index) => index !== colIndex);
-
-      return {
-        ...current,
-        columnCount: Math.max(1, current.columnCount + direction),
-        cells: nextCells,
-        columnWidths,
-      };
-    });
   };
 
   const startResize = (
@@ -255,19 +194,12 @@ export function Spreadsheet({ document, onChange }: SpreadsheetProps) {
       const minSize = type === 'column' ? MIN_COLUMN_WIDTH : MIN_ROW_HEIGHT;
       const nextSize = Math.max(minSize, startSize + currentPosition - startPosition);
 
-      patchDocument((current) => {
-        if (type === 'column') {
-          return {
-            ...current,
-            columnWidths: current.columnWidths.map((value, idx) => (idx === index ? nextSize : value)),
-          };
-        }
+      if (type === 'column') {
+        dispatch(setColumnWidth({ index, width: nextSize }));
+        return;
+      }
 
-        return {
-          ...current,
-          rowHeights: current.rowHeights.map((value, idx) => (idx === index ? nextSize : value)),
-        };
-      });
+      dispatch(setRowHeight({ index, height: nextSize }));
     };
 
     const handleUp = () => {
@@ -384,8 +316,8 @@ export function Spreadsheet({ document, onChange }: SpreadsheetProps) {
                     onDoubleClick={() => startEdit(row, col)}
                     onContextMenu={(event) => {
                       event.preventDefault();
-                      setSelectedCell({ row, col });
-                      setSelectionRange({ start: { row, col }, end: { row, col } });
+                      dispatch(selectCell({ row, col }));
+                      dispatch(selectRange({ start: { row, col }, end: { row, col } }));
                       setContextMenu({ x: event.clientX, y: event.clientY, row, col });
                     }}
                   >
@@ -420,16 +352,16 @@ export function Spreadsheet({ document, onChange }: SpreadsheetProps) {
 
       {contextMenu && (
         <div className="context-menu" style={{ top: contextMenu.y, left: contextMenu.x }}>
-          <button type="button" onClick={() => shiftRows(contextMenu.row, 1)}>
+          <button type="button" onClick={() => dispatch(insertRow(contextMenu.row))}>
             Вставить строку
           </button>
-          <button type="button" onClick={() => shiftRows(contextMenu.row, -1)}>
+          <button type="button" onClick={() => dispatch(deleteRow(contextMenu.row))}>
             Удалить строку
           </button>
-          <button type="button" onClick={() => shiftColumns(contextMenu.col, 1)}>
+          <button type="button" onClick={() => dispatch(insertColumn(contextMenu.col))}>
             Вставить столбец
           </button>
-          <button type="button" onClick={() => shiftColumns(contextMenu.col, -1)}>
+          <button type="button" onClick={() => dispatch(deleteColumn(contextMenu.col))}>
             Удалить столбец
           </button>
         </div>

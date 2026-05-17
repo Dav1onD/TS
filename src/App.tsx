@@ -1,24 +1,46 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
+import { Provider } from 'react-redux';
 import { Spreadsheet } from './spreadsheet/Spreadsheet';
 import {
   buildDocumentPreview,
-  cloneDocument,
   downloadTextFile,
   exportDocumentToCsv,
   exportDocumentToJson,
   formatDate,
-  importCsvIntoDocument,
   parseCsv,
 } from './spreadsheet/documentUtils';
 import { localDocumentApi } from './spreadsheet/mockApi';
-import type {
-  CreateDocumentInput,
-  DocumentApi,
-  DocumentSaveStatus,
-  SpreadsheetDocument,
-} from './spreadsheet/types';
-
-const CURRENT_USER_ID = 'user-1';
+import type { DocumentApi, DocumentSaveStatus } from './spreadsheet/types';
+import { createAppStore } from './store';
+import { useAppDispatch, useAppSelector } from './store/hooks';
+import { closeActiveDocument } from './store/documentsSlice';
+import {
+  closeDocument as closeSpreadsheetDocument,
+  importCsv,
+  redo,
+  setDocumentTitle,
+  undo,
+} from './store/spreadsheetSlice';
+import {
+  closeCreateModal,
+  closeImportModal,
+  openCreateModal,
+  openImportModal,
+  setCreateInput,
+  setCsvImportText,
+  setRenameValue,
+  startRenaming,
+  stopRenaming,
+} from './store/uiSlice';
+import {
+  createDocumentThunk,
+  deleteDocumentThunk,
+  duplicateDocumentThunk,
+  fetchDocuments,
+  loadDocumentById,
+  renameDocumentThunk,
+  saveActiveDocument,
+} from './store/thunks';
 
 type AppProps = {
   api?: DocumentApi;
@@ -31,119 +53,40 @@ function saveStatusLabel(status: DocumentSaveStatus) {
   return 'Сохранено';
 }
 
-export default function App({ api = localDocumentApi }: AppProps) {
-  const [documents, setDocuments] = useState<SpreadsheetDocument[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [activeDocumentId, setActiveDocumentId] = useState<string | null>(null);
-  const [draftDocument, setDraftDocument] = useState<SpreadsheetDocument | null>(null);
-  const [saveStatus, setSaveStatus] = useState<DocumentSaveStatus>('saved');
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [createInput, setCreateInput] = useState<CreateDocumentInput>({
-    title: 'Новый документ',
-    rowCount: 100,
-    columnCount: 26,
-  });
-  const [renamingDocumentId, setRenamingDocumentId] = useState<string | null>(null);
-  const [renameValue, setRenameValue] = useState('');
-  const [csvImportText, setCsvImportText] = useState('');
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const lastSavedSerializedRef = useRef('');
-  const saveTimeoutRef = useRef<number | null>(null);
-  const draftDocumentRef = useRef<SpreadsheetDocument | null>(null);
+function AppInner() {
+  const dispatch = useAppDispatch();
+  const documents = useAppSelector((state) => state.documents.items);
+  const isLoading = useAppSelector((state) => state.documents.isLoading);
+  const activeDocumentId = useAppSelector((state) => state.documents.activeDocumentId);
+  const draftDocument = useAppSelector((state) => state.spreadsheet.currentDocument);
+  const lastSavedSerialized = useAppSelector((state) => state.spreadsheet.lastSavedSerialized);
+  const saveStatus = useAppSelector((state) => state.ui.saveStatus);
+  const isCreateModalOpen = useAppSelector((state) => state.ui.isCreateModalOpen);
+  const createInput = useAppSelector((state) => state.ui.createInput);
+  const renamingDocumentId = useAppSelector((state) => state.ui.renamingDocumentId);
+  const renameValue = useAppSelector((state) => state.ui.renameValue);
+  const csvImportText = useAppSelector((state) => state.ui.csvImportText);
+  const isImportModalOpen = useAppSelector((state) => state.ui.isImportModalOpen);
+  const draftDocumentRef = useRef(draftDocument);
 
   useEffect(() => {
     draftDocumentRef.current = draftDocument;
   }, [draftDocument]);
 
   useEffect(() => {
-    let isMounted = true;
-    api.listDocuments(CURRENT_USER_ID).then((items) => {
-      if (!isMounted) {
-        return;
-      }
-      setDocuments(items);
-      setIsLoading(false);
-    });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [api]);
+    void dispatch(fetchDocuments());
+  }, [dispatch]);
 
   const draftSerialized = useMemo(
     () => (draftDocument ? JSON.stringify(draftDocument) : ''),
     [draftDocument],
   );
-  const hasUnsavedChanges =
-    Boolean(draftDocument) && draftSerialized !== lastSavedSerializedRef.current;
-
-  const openDocument = (document: SpreadsheetDocument) => {
-    const copy = cloneDocument(document);
-    setActiveDocumentId(document.id);
-    setDraftDocument(copy);
-    lastSavedSerializedRef.current = JSON.stringify(copy);
-    setSaveStatus('saved');
-  };
+  const hasUnsavedChanges = Boolean(draftDocument) && draftSerialized !== lastSavedSerialized;
 
   const closeDocument = () => {
-    setActiveDocumentId(null);
-    setDraftDocument(null);
-    setSaveStatus('saved');
-    setCsvImportText('');
-    setIsImportModalOpen(false);
+    dispatch(closeActiveDocument());
+    dispatch(closeSpreadsheetDocument());
   };
-
-  const saveNow = async () => {
-    const currentDraft = draftDocumentRef.current;
-    if (!currentDraft) {
-      return;
-    }
-
-    const serialized = JSON.stringify(currentDraft);
-    if (serialized === lastSavedSerializedRef.current) {
-      setSaveStatus('saved');
-      return;
-    }
-
-    setSaveStatus('saving');
-
-    try {
-      const saved = await api.patchDocument(currentDraft.id, currentDraft);
-      const savedSerialized = JSON.stringify(saved);
-      lastSavedSerializedRef.current = savedSerialized;
-      setDocuments((prev) => prev.map((item) => (item.id === saved.id ? saved : item)));
-      setDraftDocument((prev) => {
-        if (!prev || prev.id !== saved.id) {
-          return prev;
-        }
-        return JSON.stringify(prev) === serialized ? saved : prev;
-      });
-      setSaveStatus('saved');
-    } catch {
-      setSaveStatus('error');
-    }
-  };
-
-  useEffect(() => {
-    if (saveTimeoutRef.current) {
-      window.clearTimeout(saveTimeoutRef.current);
-    }
-
-    if (!draftDocument || !hasUnsavedChanges) {
-      return;
-    }
-
-    setSaveStatus((prev) => (prev === 'error' ? prev : 'pending'));
-    saveTimeoutRef.current = window.setTimeout(() => {
-      void saveNow();
-    }, 500);
-
-    return () => {
-      if (saveTimeoutRef.current) {
-        window.clearTimeout(saveTimeoutRef.current);
-      }
-    };
-  }, [draftDocument, draftSerialized, hasUnsavedChanges]);
 
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -155,9 +98,29 @@ export default function App({ api = localDocumentApi }: AppProps) {
     };
 
     const handleHotkey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const isTypingTarget =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target?.isContentEditable;
+
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
         event.preventDefault();
-        void saveNow();
+        void dispatch(saveActiveDocument());
+      }
+
+      if (!draftDocumentRef.current || isTypingTarget) {
+        return;
+      }
+
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
+        event.preventDefault();
+        dispatch(undo());
+      }
+
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'y') {
+        event.preventDefault();
+        dispatch(redo());
       }
     };
 
@@ -168,26 +131,16 @@ export default function App({ api = localDocumentApi }: AppProps) {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       window.removeEventListener('keydown', handleHotkey);
     };
-  }, [hasUnsavedChanges]);
-
-  const handleCreateDocument = async () => {
-    const created = await api.createDocument(CURRENT_USER_ID, createInput);
-    setDocuments((prev) => [created, ...prev]);
-    setIsCreateModalOpen(false);
-    openDocument(created);
-  };
+  }, [dispatch, hasUnsavedChanges]);
 
   const handleRenameDocument = async (id: string) => {
     const nextTitle = renameValue.trim();
     if (!nextTitle) {
-      setRenamingDocumentId(null);
+      dispatch(stopRenaming());
       return;
     }
 
-    const renamed = await api.renameDocument(id, nextTitle);
-    setDocuments((prev) => prev.map((item) => (item.id === id ? renamed : item)));
-    setDraftDocument((prev) => (prev && prev.id === id ? { ...prev, title: renamed.title } : prev));
-    setRenamingDocumentId(null);
+    await dispatch(renameDocumentThunk({ id, title: nextTitle }));
   };
 
   const handleDeleteDocument = async (id: string) => {
@@ -195,19 +148,18 @@ export default function App({ api = localDocumentApi }: AppProps) {
       return;
     }
 
-    await api.deleteDocument(id);
-    setDocuments((prev) => prev.filter((item) => item.id !== id));
+    await dispatch(deleteDocumentThunk(id));
     if (activeDocumentId === id) {
       closeDocument();
     }
   };
 
   const handleDuplicateDocument = async (id: string) => {
-    const copy = await api.duplicateDocument(id, CURRENT_USER_ID);
-    setDocuments((prev) => [copy, ...prev]);
+    await dispatch(duplicateDocumentThunk(id));
   };
 
-  const activeDocument = documents.find((document) => document.id === activeDocumentId) ?? null;
+  const activeDocument =
+    documents.find((item: (typeof documents)[number]) => item.id === activeDocumentId) ?? null;
   const parsedCsvHeaders = useMemo(() => {
     if (!csvImportText.trim()) {
       return [];
@@ -226,20 +178,20 @@ export default function App({ api = localDocumentApi }: AppProps) {
       {!draftDocument ? (
         <div className="dashboard">
           <div className="dashboard-hero dashboard-hero-compact">
-            <button className="primary-button" onClick={() => setIsCreateModalOpen(true)}>
+            <button className="primary-button" onClick={() => dispatch(openCreateModal())}>
               Новый документ
             </button>
           </div>
 
           <div className="document-grid">
-            {documents.map((document) => {
-              const preview = buildDocumentPreview(document);
+            {documents.map((item: (typeof documents)[number]) => {
+              const preview = buildDocumentPreview(item);
               return (
-                <article className="document-card" key={document.id}>
+                <article className="document-card" key={item.id}>
                   <button
                     className="document-open-button"
-                    onClick={() => openDocument(document)}
-                    data-testid={`open-document-${document.id}`}
+                    onClick={() => void dispatch(loadDocumentById(item.id))}
+                    data-testid={`open-document-${item.id}`}
                   >
                     <div className="preview-grid" aria-hidden="true">
                       {preview.flat().map((value, index) => (
@@ -249,39 +201,36 @@ export default function App({ api = localDocumentApi }: AppProps) {
                       ))}
                     </div>
                     <div className="document-card-body">
-                      {renamingDocumentId === document.id ? (
+                      {renamingDocumentId === item.id ? (
                         <input
                           autoFocus
                           value={renameValue}
-                          onChange={(event) => setRenameValue(event.target.value)}
-                          onBlur={() => void handleRenameDocument(document.id)}
+                          onChange={(event) => dispatch(setRenameValue(event.target.value))}
+                          onBlur={() => void handleRenameDocument(item.id)}
                           onKeyDown={(event) => {
                             if (event.key === 'Enter') {
-                              void handleRenameDocument(document.id);
+                              void handleRenameDocument(item.id);
                             }
                           }}
                         />
                       ) : (
-                        <h2>{document.title}</h2>
+                        <h2>{item.title}</h2>
                       )}
-                      <p>Создан: {formatDate(document.createdAt)}</p>
-                      <p>Изменён: {formatDate(document.updatedAt)}</p>
+                      <p>Создан: {formatDate(item.createdAt)}</p>
+                      <p>Изменён: {formatDate(item.updatedAt)}</p>
                     </div>
                   </button>
                   <div className="card-actions">
                     <button
                       type="button"
-                      onClick={() => {
-                        setRenamingDocumentId(document.id);
-                        setRenameValue(document.title);
-                      }}
+                      onClick={() => dispatch(startRenaming({ id: item.id, title: item.title }))}
                     >
                       Переименовать
                     </button>
-                    <button type="button" onClick={() => void handleDuplicateDocument(document.id)}>
+                    <button type="button" onClick={() => void handleDuplicateDocument(item.id)}>
                       Дублировать
                     </button>
-                    <button type="button" onClick={() => void handleDeleteDocument(document.id)}>
+                    <button type="button" onClick={() => void handleDeleteDocument(item.id)}>
                       Удалить
                     </button>
                   </div>
@@ -300,16 +249,14 @@ export default function App({ api = localDocumentApi }: AppProps) {
               <input
                 className="document-title-input"
                 value={draftDocument.title}
-                onChange={(event) =>
-                  setDraftDocument((prev) => (prev ? { ...prev, title: event.target.value } : prev))
-                }
+                onChange={(event) => dispatch(setDocumentTitle(event.target.value))}
               />
               <span className={`save-pill save-${saveStatus}`} data-testid="save-status">
                 {saveStatusLabel(saveStatus)}
               </span>
             </div>
             <div className="editor-actions">
-              <button className="ghost-button" onClick={() => void saveNow()}>
+              <button className="ghost-button" onClick={() => void dispatch(saveActiveDocument())}>
                 Сохранить
               </button>
               <button
@@ -336,7 +283,7 @@ export default function App({ api = localDocumentApi }: AppProps) {
               >
                 Экспорт JSON
               </button>
-              <button className="ghost-button" onClick={() => setIsImportModalOpen(true)}>
+              <button className="ghost-button" onClick={() => dispatch(openImportModal())}>
                 Импорт CSV
               </button>
               {activeDocument && (
@@ -358,10 +305,7 @@ export default function App({ api = localDocumentApi }: AppProps) {
             </div>
           </div>
 
-          <Spreadsheet
-            document={draftDocument}
-            onChange={setDraftDocument}
-          />
+          <Spreadsheet />
         </div>
       )}
 
@@ -373,9 +317,7 @@ export default function App({ api = localDocumentApi }: AppProps) {
               Название
               <input
                 value={createInput.title}
-                onChange={(event) =>
-                  setCreateInput((prev) => ({ ...prev, title: event.target.value }))
-                }
+                onChange={(event) => dispatch(setCreateInput({ title: event.target.value }))}
               />
             </label>
             <div className="size-grid">
@@ -386,10 +328,7 @@ export default function App({ api = localDocumentApi }: AppProps) {
                   min="1"
                   value={createInput.rowCount}
                   onChange={(event) =>
-                    setCreateInput((prev) => ({
-                      ...prev,
-                      rowCount: Math.max(1, Number(event.target.value)),
-                    }))
+                    dispatch(setCreateInput({ rowCount: Math.max(1, Number(event.target.value)) }))
                   }
                 />
               </label>
@@ -400,19 +339,21 @@ export default function App({ api = localDocumentApi }: AppProps) {
                   min="1"
                   value={createInput.columnCount}
                   onChange={(event) =>
-                    setCreateInput((prev) => ({
-                      ...prev,
-                      columnCount: Math.max(1, Number(event.target.value)),
-                    }))
+                    dispatch(
+                      setCreateInput({ columnCount: Math.max(1, Number(event.target.value)) }),
+                    )
                   }
                 />
               </label>
             </div>
             <div className="modal-actions">
-              <button className="ghost-button" onClick={() => setIsCreateModalOpen(false)}>
+              <button className="ghost-button" onClick={() => dispatch(closeCreateModal())}>
                 Отмена
               </button>
-              <button className="primary-button" onClick={() => void handleCreateDocument()}>
+              <button
+                className="primary-button"
+                onClick={() => void dispatch(createDocumentThunk(createInput))}
+              >
                 Создать
               </button>
             </div>
@@ -434,7 +375,7 @@ export default function App({ api = localDocumentApi }: AppProps) {
                   if (!file) {
                     return;
                   }
-                  setCsvImportText(await file.text());
+                  dispatch(setCsvImportText(await file.text()));
                 }}
               />
             </label>
@@ -451,18 +392,15 @@ export default function App({ api = localDocumentApi }: AppProps) {
               </>
             )}
             <div className="modal-actions">
-              <button className="ghost-button" onClick={() => setIsImportModalOpen(false)}>
+              <button className="ghost-button" onClick={() => dispatch(closeImportModal())}>
                 Отмена
               </button>
               <button
                 className="primary-button"
                 disabled={!csvImportText.trim()}
                 onClick={() => {
-                  setDraftDocument((prev) =>
-                    prev ? importCsvIntoDocument(prev, csvImportText) : prev,
-                  );
-                  setIsImportModalOpen(false);
-                  setCsvImportText('');
+                  dispatch(importCsv(csvImportText));
+                  dispatch(closeImportModal());
                 }}
               >
                 Импортировать
@@ -472,5 +410,15 @@ export default function App({ api = localDocumentApi }: AppProps) {
         </div>
       )}
     </div>
+  );
+}
+
+export default function App({ api = localDocumentApi }: AppProps) {
+  const storeRef = useRef(createAppStore(api));
+
+  return (
+    <Provider store={storeRef.current}>
+      <AppInner />
+    </Provider>
   );
 }
