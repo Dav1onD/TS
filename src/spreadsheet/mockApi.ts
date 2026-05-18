@@ -60,6 +60,12 @@ export function createLocalDocumentApi(): DocumentApi {
         .filter((document) => document.userId === userId)
         .map((document) => cloneDocument(document));
     },
+    async getDocumentById(userId, id) {
+      await wait();
+      const document =
+        loadDocuments().find((item) => item.userId === userId && item.id === id) ?? null;
+      return document ? cloneDocument(document) : null;
+    },
     async createDocument(userId, input: CreateDocumentInput) {
       await wait();
       const created = createEmptyDocument(userId, input.title, input.rowCount, input.columnCount);

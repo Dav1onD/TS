@@ -44,6 +44,7 @@ export type CreateDocumentInput = {
 
 export type DocumentApi = {
   listDocuments: (userId: string) => Promise<SpreadsheetDocument[]>;
+  getDocumentById: (userId: string, id: string) => Promise<SpreadsheetDocument | null>;
   createDocument: (userId: string, input: CreateDocumentInput) => Promise<SpreadsheetDocument>;
   renameDocument: (id: string, title: string) => Promise<SpreadsheetDocument>;
   deleteDocument: (id: string) => Promise<void>;

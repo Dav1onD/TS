@@ -21,10 +21,10 @@ export const loadDocumentById = createAsyncThunk<
   SpreadsheetDocument,
   string,
   { state: RootState; extra: StoreExtra }
->('documents/loadDocumentById', async (id, { getState }) => {
-  const document = getState().documents.items.find((item) => item.id === id);
+>('documents/loadDocumentById', async (id, { extra, rejectWithValue }) => {
+  const document = await extra.api.getDocumentById(CURRENT_USER_ID, id);
   if (!document) {
-    throw new Error('Document not found');
+    return rejectWithValue('Document not found');
   }
 
   return cloneDocument(document);

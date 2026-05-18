@@ -9,6 +9,10 @@ function createTestApi(initial: SpreadsheetDocument[]): DocumentApi {
 
   return {
     listDocuments: vi.fn(async (userId: string) => documents.filter((item) => item.userId === userId)),
+    getDocumentById: vi.fn(async (userId, id) => {
+      const document = documents.find((item) => item.userId === userId && item.id === id) ?? null;
+      return document;
+    }),
     createDocument: vi.fn(async (userId, input) => {
       const created = createEmptyDocument(userId, input.title, input.rowCount, input.columnCount);
       documents = [created, ...documents];
@@ -45,7 +49,7 @@ describe('App document management', () => {
     const foreign = createEmptyDocument('user-2', 'Чужой документ', 10, 5);
     const api = createTestApi([own, foreign]);
 
-    render(<App api={api} />);
+    render(<App api={api} initialEntries={['/dashboard']} />);
 
     expect(await screen.findByText('Мой документ')).toBeInTheDocument();
     expect(screen.queryByText('Чужой документ')).not.toBeInTheDocument();
@@ -55,7 +59,7 @@ describe('App document management', () => {
     const own = createEmptyDocument('user-1', 'Таблица', 10, 5);
     const api = createTestApi([own]);
 
-    render(<App api={api} />);
+    render(<App api={api} initialEntries={['/dashboard']} />);
     fireEvent.click(await screen.findByTestId(`open-document-${own.id}`));
 
     const formulaInput = await screen.findByTestId('formula-input');
@@ -88,7 +92,7 @@ describe('App document management', () => {
     const own = createEmptyDocument('user-1', 'Исходник', 10, 5);
     const api = createTestApi([own]);
 
-    render(<App api={api} />);
+    render(<App api={api} initialEntries={['/dashboard']} />);
 
     fireEvent.click(await screen.findByText('Новый документ'));
     fireEvent.change(screen.getByDisplayValue('Новый документ'), {
@@ -104,6 +108,33 @@ describe('App document management', () => {
     expect(sourceCard).not.toBeNull();
     fireEvent.click(within(sourceCard as HTMLElement).getByText('Дублировать'));
 
-    expect(await screen.findByText('Исходник (копия)')).toBeInTheDocument();
+    expect(await screen.findByDisplayValue('Исходник (копия)')).toBeInTheDocument();
+  });
+
+  it('opens document by direct link and passes document id via route param', async () => {
+    const own = createEmptyDocument('user-1', 'Прямая ссылка', 10, 5);
+    const api = createTestApi([own]);
+
+    render(<App api={api} initialEntries={[`/documents/${own.id}`]} />);
+
+    expect(await screen.findByDisplayValue('Прямая ссылка')).toBeInTheDocument();
+    expect(api.getDocumentById).toHaveBeenCalledWith('user-1', own.id);
+  });
+
+  it('asks for confirmation before leaving editor with unsaved changes', async () => {
+    const own = createEmptyDocument('user-1', 'Черновик', 10, 5);
+    const api = createTestApi([own]);
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+    render(<App api={api} initialEntries={[`/documents/${own.id}`]} />);
+
+    const formulaInput = await screen.findByTestId('formula-input');
+    fireEvent.change(formulaInput, { target: { value: '42' } });
+    fireEvent.click(screen.getByText('Назад к документам'));
+
+    expect(confirmSpy).toHaveBeenCalledWith('Есть несохранённые изменения. Покинуть страницу?');
+    expect(screen.getByDisplayValue('Черновик')).toBeInTheDocument();
+
+    confirmSpy.mockRestore();
   });
 });
